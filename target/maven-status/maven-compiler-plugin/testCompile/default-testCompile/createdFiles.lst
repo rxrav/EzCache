@@ -1,5 +1,0 @@
-com\github\rxrav\ezcache\core\cmd\EzCacheTestClientTest.class
-com\github\rxrav\ezcache\AppTest.class
-com\github\rxrav\ezcache\core\cmd\JedisClientTest.class
-com\github\rxrav\ezcache\core\ser\DeserializerTests.class
-com\github\rxrav\ezcache\core\ser\SerializerTests.class
