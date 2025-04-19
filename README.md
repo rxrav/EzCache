@@ -70,10 +70,17 @@ which will contain, `redis-cli.exe` and `redis-benchmark.exe`. It will also cont
 ### Performance
 
 ```bash
-redis-benchmark.exe -t SET,GET -q
+> .\redis-benchmark.exe -t SET,GET -q
+SET: 56529.11 requests per second
+GET: 55772.45 requests per second
 
-SET: 30590.39 requests per second
-GET: 33123.55 requests per second
+> .\redis-benchmark.exe -t SET,GET -q
+SET: 56465.27 requests per second
+GET: 55959.71 requests per second
+
+> .\redis-benchmark.exe -t SET,GET -q
+SET: 54200.54 requests per second
+GET: 55432.37 requests per second
 ```
 
 *This has been tested on my HP Laptop (Intel Core i5 + 8GB, running Windows 10), keeping in mind Java's WORA principle,

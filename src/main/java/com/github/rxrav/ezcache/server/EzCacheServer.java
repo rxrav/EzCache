@@ -37,7 +37,7 @@ public class EzCacheServer {
         this.restoreDb();
         logger.info("Creating executor service...");
         ThreadFactory tf = Thread.ofVirtual().name("client-handler-", 1).factory();
-        executorService = Executors.newThreadPerTaskExecutor(tf);
+        executorService = Executors.newFixedThreadPool(250, tf);
     }
 
     private void restoreDb() {
