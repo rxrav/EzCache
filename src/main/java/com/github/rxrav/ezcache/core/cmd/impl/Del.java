@@ -15,12 +15,8 @@ public class Del extends Command {
 
     @Override
     protected ValueWrapper execute(Memory memoryRef) {
-        int i = 0;
-        for (String key: super.getArgs()) {
-            ValueWrapper obj = memoryRef.remove(key);
-            if (obj != null) ++i;
-        }
-        return new ValueWrapper(i, ValueType.NUMBER);
+        // Single write-lock for all keys — N times fewer lock acquisitions.
+        return new ValueWrapper(memoryRef.removeMany(super.getArgs()), ValueType.NUMBER);
     }
 }
 

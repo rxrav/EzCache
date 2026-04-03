@@ -121,11 +121,10 @@ public class Set extends Command {
     }
 
     private static void set(Memory memoryRef, ValueType valType, String key, int iVal, String sVal, long timeout) throws UnsupportedEncodingException {
-        if (valType == ValueType.NUMBER) {
-            memoryRef.putData(key, new ValueWrapper(iVal, ValueType.NUMBER));
-        } else {
-            memoryRef.putData(key, new ValueWrapper(sVal, ValueType.STRING));
-        }
-        memoryRef.putExpiryData(key, new ExpiryMetadata(new Date().getTime(), timeout));
+        // Single write-lock for both maps — eliminates partial-write window.
+        ValueWrapper vw = (valType == ValueType.NUMBER)
+                ? new ValueWrapper(iVal, ValueType.NUMBER)
+                : new ValueWrapper(sVal, ValueType.STRING);
+        memoryRef.putDataWithExpiry(key, vw, new ExpiryMetadata(new Date().getTime(), timeout));
     }
 }

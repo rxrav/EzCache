@@ -15,10 +15,7 @@ public class Exists extends Command {
 
     @Override
     protected ValueWrapper execute(Memory memoryRef) {
-        int i = 0;
-        for (String key: super.getArgs()) {
-            if (memoryRef.has(key)) ++i;
-        }
-        return new ValueWrapper(i, ValueType.NUMBER);
+        // Single read-lock for all keys — N times fewer lock acquisitions.
+        return new ValueWrapper(memoryRef.hasMany(super.getArgs()), ValueType.NUMBER);
     }
 }

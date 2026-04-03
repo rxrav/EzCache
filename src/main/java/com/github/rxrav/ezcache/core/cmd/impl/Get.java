@@ -25,8 +25,10 @@ public class Get extends Command {
     @Override
     protected ValueWrapper execute(Memory memoryRef) {
         String key = super.getArgs()[0];
-        ValueWrapper obj = memoryRef.get(key);
-        ExpiryMetadata expiryMetadata = memoryRef.getExpMd(key);
+        // Single read-lock for both value and expiry — eliminates TOCTOU race.
+        Memory.EntryWithExpiry entry = memoryRef.getWithExpiry(key);
+        ValueWrapper obj = entry.value();
+        ExpiryMetadata expiryMetadata = entry.expiry();
         boolean itHasExpired = (expiryMetadata != null) && hasExpired(expiryMetadata);
 
         if (obj == null) return null;

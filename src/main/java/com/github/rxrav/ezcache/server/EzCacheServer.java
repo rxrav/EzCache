@@ -3,7 +3,9 @@ package com.github.rxrav.ezcache.server;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.rxrav.ezcache.core.Constants;
+import com.github.rxrav.ezcache.core.ExpiryMetadata;
 import com.github.rxrav.ezcache.core.Memory;
+import com.github.rxrav.ezcache.core.ValueWrapper;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -15,6 +17,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -50,8 +55,35 @@ public class EzCacheServer {
 
                 String[] data = fileContentStr.split(Constants.SEPARATOR);
                 ObjectMapper mapper = new ObjectMapper();
-                this.memoryRef.setMainMemory(mapper.readValue(data[0], new TypeReference<>() {}));
-                this.memoryRef.setExpiryMetadataRef(mapper.readValue(data[1], new TypeReference<>() {}));
+
+                // Unmarshal both maps concurrently — they are independent byte conversions.
+                CompletableFuture<Map<String, ValueWrapper>> memFuture =
+                        CompletableFuture.supplyAsync(() -> {
+                            try {
+                                return mapper.readValue(data[0], new TypeReference<>() {});
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+                CompletableFuture<Map<String, ExpiryMetadata>> expFuture =
+                        CompletableFuture.supplyAsync(() -> {
+                            try {
+                                return mapper.readValue(data[1], new TypeReference<>() {});
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+
+                try {
+                    this.memoryRef.setMainMemory(memFuture.get());
+                    this.memoryRef.setExpiryMetadataRef(expFuture.get());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
+                } catch (ExecutionException e) {
+                    throw new RuntimeException(e);
+                }
+
                 if (!this.memoryRef.getMainMemorySnapshot().isEmpty() ||
                         !this.memoryRef.getExpiryMetadataRefSnapshot().isEmpty()) {
                     logger.info("Data restored from backup file");
@@ -91,9 +123,18 @@ public class EzCacheServer {
             logger.info("Shutdown hook triggered. Stopping EzCache server...");
             try {
                 logger.info("Terminating client connections...");
-                for(Socket connectedClient: this.connectedClientList) {
-                    connectedClient.close();
+                // Close all client sockets concurrently — serial close is O(n) latency.
+                List<CompletableFuture<Void>> closeFutures = new ArrayList<>();
+                for (Socket connectedClient : this.connectedClientList) {
+                    closeFutures.add(CompletableFuture.runAsync(() -> {
+                        try {
+                            connectedClient.close();
+                        } catch (IOException e) {
+                            logger.error("Error closing client socket: {}", e.getMessage());
+                        }
+                    }));
                 }
+                CompletableFuture.allOf(closeFutures.toArray(new CompletableFuture[0])).join();
                 logger.info("Shutting down executor service...");
                 this.executorService.shutdown();
                 this.stop();
